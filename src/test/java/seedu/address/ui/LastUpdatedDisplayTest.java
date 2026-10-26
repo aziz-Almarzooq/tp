@@ -1,6 +1,7 @@
 package seedu.address.ui;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -146,6 +147,22 @@ public class LastUpdatedDisplayTest {
     }
 
     @Test
+    public void add_recentContact_showsDateWithoutUpdateReminder() throws Exception {
+        runOnFxThread(() -> {
+            LocalDate before = LocalDate.now();
+            logic.execute("add n/Carol p/91234567 e/carol@example.com a/NUS");
+            Person added = model.getFilteredPersonList().stream()
+                    .filter(person -> person.getName().fullName.equals("Carol"))
+                    .findFirst().orElseThrow();
+
+            assertTrue(added.getLastUpdated().equals(before) || added.getLastUpdated().equals(LocalDate.now()));
+            assertDate(scene, added);
+            assertNoUpdateReminder(scene, added);
+            return null;
+        });
+    }
+
+    @Test
     public void edit_refreshesDisplayedDate() throws Exception {
         runOnFxThread(() -> {
             LocalDate before = LocalDate.now();
@@ -155,6 +172,7 @@ public class LastUpdatedDisplayTest {
             assertEquals(new PersonBuilder(alice).withPhone("91234567")
                     .withLastUpdated(edited.getLastUpdated()).build(), edited);
             assertDate(scene, edited);
+            assertNoUpdateReminder(scene, edited);
             assertDate(scene, bob);
             return null;
         });
@@ -218,18 +236,27 @@ public class LastUpdatedDisplayTest {
     }
 
     private void assertDate(Scene scene, Person person) {
-        scene.getRoot().applyCss();
-        scene.getRoot().layout();
-        ListView<?> list = (ListView<?>) scene.lookup("#personListView");
-        ListCell<?> cell = list.lookupAll(".list-cell").stream()
-                .filter(node -> node instanceof ListCell<?> candidate && person.equals(candidate.getItem()))
-                .map(node -> (ListCell<?>) node)
-                .findFirst().orElseThrow();
-        Label label = dateLabel(cell.getGraphic());
+        Label label = dateLabel(personCell(scene, person).getGraphic());
         assertEquals("Last updated: " + person.getLastUpdated(), label.getText());
         assertTrue(label.isVisible());
         assertTrue(label.isManaged());
         assertTrue(label.getHeight() > 0);
+    }
+
+    private void assertNoUpdateReminder(Scene scene, Person person) {
+        assertFalse(personCell(scene, person).getGraphic().lookupAll(".system-tag").stream()
+                .map(node -> (Label) node)
+                .anyMatch(label -> label.getText().equals("update")));
+    }
+
+    private ListCell<?> personCell(Scene scene, Person person) {
+        scene.getRoot().applyCss();
+        scene.getRoot().layout();
+        ListView<?> list = (ListView<?>) scene.lookup("#personListView");
+        return list.lookupAll(".list-cell").stream()
+                .filter(node -> node instanceof ListCell<?> candidate && person.equals(candidate.getItem()))
+                .map(node -> (ListCell<?>) node)
+                .findFirst().orElseThrow();
     }
 
     private Label dateLabel(Node card) {
